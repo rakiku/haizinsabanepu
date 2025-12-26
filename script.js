@@ -1,199 +1,177 @@
 import { initializeApp } from "firebase/app";
 import { getDatabase, ref, set, onValue, update, push } from "firebase/database";
-import { getStorage, ref as sRef, uploadBytes, getDownloadURL } from "firebase/storage";
 
-// --- 🔴 Firebase設定をここに貼り付けてください ---
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-    databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_PROJECT_ID.appspot.com",
-    messagingSenderId: "YOUR_SENDER_ID",
-    appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyBpQCKsoUaWwHzFRkmYlLuqygyDc8c3vmw",
+  authDomain: "haizinsaba.firebaseapp.com",
+  projectId: "haizinsaba",
+  storageBucket: "haizinsaba.firebasestorage.app",
+  messagingSenderId: "1061589488690",
+  appId: "1:1061589488690:web:9b13632f53f0609b38182b",
+  measurementId: "G-Z07PHF0214"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
+
+const firebaseConfig = {
+    apiKey: "あなたのAPIキー",
+    authDomain: "haizinsaba.firebaseapp.com",
+    databaseURL: "https://haizinsaba-default-rtdb.firebaseio.com",
+    projectId: "haizinsaba",
+    storageBucket: "haizinsaba.firebasestorage.app",
+    messagingSenderId: "1061589488690",
+    appId: "..."
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
-const storage = getStorage(app);
 
-// 状態変数
-let currentRoomId = "";
+let roomId = "";
 let myPos = null;
 let isHost = false;
-let currentQuestionSet = null;
 
-// --- 画面切り替え ---
-window.showView = (viewId) => {
+// 画面切り替え
+window.showView = (id) => {
     document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
-    document.getElementById(viewId).classList.remove('hidden');
+    document.getElementById(id).classList.remove('hidden');
 };
 
-// --- 問題作成機能 ---
-let questionCount = 0;
+// 問題フォーム追加
+let qIdx = 0;
 window.addQuestionForm = () => {
-    questionCount++;
+    qIdx++;
     const div = document.createElement('div');
     div.className = "card";
     div.innerHTML = `
-        <p>第${questionCount}問</p>
+        <p>第${qIdx}問</p>
         <input type="text" class="q-txt" placeholder="問題文">
-        <input type="text" class="q-ans" placeholder="正解(5文字なら5文字)">
-        <input type="number" class="q-time" placeholder="秒数" value="20">
-        <input type="file" class="q-img" accept="image/*">
+        <input type="text" class="q-ans" placeholder="答え">
+        <input type="number" class="q-time" placeholder="制限時間(秒)" value="20">
+        <input type="text" class="q-img" placeholder="画像URL(任意)">
     `;
     document.getElementById('question-list').appendChild(div);
 };
 
+// 保存
 window.saveQuestionSet = async () => {
     const title = document.getElementById('set-title').value;
     const pass = document.getElementById('set-pass').value;
-    const forms = document.querySelectorAll('#question-list .card');
-    const questions = [];
-
-    for (let form of forms) {
-        const file = form.querySelector('.q-img').files[0];
-        let imgUrl = "";
-        if (file) {
-            const storageRef = sRef(storage, `images/${Date.now()}_${file.name}`);
-            const snapshot = await uploadBytes(storageRef, file);
-            imgUrl = await getDownloadURL(snapshot.ref);
-        }
-        questions.push({
-            text: form.querySelector('.q-txt').value,
-            answer: form.querySelector('.q-ans').value,
-            time: parseInt(form.querySelector('.q-time').value),
-            image: imgUrl
-        });
-    }
-
-    const newSetRef = push(ref(db, 'library'));
-    await set(newSetRef, { title, pass, questions });
-    alert("保存完了！");
+    const questions = Array.from(document.querySelectorAll('#question-list .card')).map(form => ({
+        text: form.querySelector('.q-txt').value,
+        answer: form.querySelector('.q-ans').value,
+        time: parseInt(form.querySelector('.q-time').value),
+        image: form.querySelector('.q-img').value
+    }));
+    await push(ref(db, 'library'), { title, pass, questions });
+    alert("保存しました！");
     showView('view-lobby');
 };
 
-// --- ゲーム進行機能 ---
+// ルーム参加
 window.joinRoom = () => {
-    currentRoomId = document.getElementById('room-id').value;
-    if (!currentRoomId) return alert("IDを入力してください");
-
-    const roomRef = ref(db, `rooms/${currentRoomId}`);
-    onValue(roomRef, (snapshot) => {
-        const data = snapshot.val();
-        if (data) syncGame(data);
+    roomId = document.getElementById('room-id').value;
+    if(!roomId) return;
+    const roomRef = ref(db, `rooms/${roomId}`);
+    onValue(roomRef, (snap) => {
+        const data = snap.val();
+        if(data) sync(data);
+        else if(!isHost) { isHost = true; set(roomRef, { status: 'waiting' }); }
     });
-
-    // 初回ホスト判定（簡易的に誰もいない場合ホスト）
-    onValue(roomRef, (snapshot) => {
-        if (!snapshot.exists()) {
-            isHost = true;
-            set(roomRef, { status: 'waiting', host: true });
-        }
-    }, { onlyOnce: true });
-
     loadSets();
     showView('view-game');
 };
 
-async function loadSets() {
-    onValue(ref(db, 'library'), (snapshot) => {
-        const sets = snapshot.val();
-        const select = document.getElementById('set-selector');
-        select.innerHTML = '<option value="">セットを選択</option>';
-        for (let key in sets) {
-            select.innerHTML += `<option value="${key}">${sets[key].title}</option>`;
-        }
+function loadSets() {
+    onValue(ref(db, 'library'), (snap) => {
+        const sets = snap.val();
+        const sel = document.getElementById('set-selector');
+        sel.innerHTML = '<option value="">セット選択</option>';
+        for(let key in sets) sel.innerHTML += `<option value="${key}">${sets[key].title}</option>`;
     });
 }
 
-// ゲーム同期のメインロジック
-function syncGame(data) {
+function sync(data) {
     const q = data.currentQuestion;
-    if (!q) return;
-
-    // 1. 問題表示
+    if(!q) return;
+    
     document.getElementById('q-text').innerText = q.text;
-    if (q.image) {
-        document.getElementById('q-image').src = q.image;
-        document.getElementById('q-image').classList.remove('hidden');
-    } else {
-        document.getElementById('q-image').classList.add('hidden');
-    }
+    document.getElementById('display-mode').innerText = `${q.answer.length} LEAGUE`;
+    const img = document.getElementById('q-image');
+    if(q.image) { img.src = q.image; img.classList.remove('hidden'); } else { img.classList.add('hidden'); }
 
-    // 2. 文字数に合わせてボックス生成
-    const ansContainer = document.getElementById('answer-container');
-    if (ansContainer.childElementCount !== q.answer.length) {
-        ansContainer.innerHTML = "";
-        for (let i = 1; i <= q.answer.length; i++) {
+    // 回答欄生成
+    const container = document.getElementById('answer-container');
+    if(container.childElementCount !== q.answer.length) {
+        container.innerHTML = "";
+        for(let i=1; i<=q.answer.length; i++) {
             const input = document.createElement('input');
             input.className = "answer-box";
-            input.maxLength = 1;
             input.id = `box-${i}`;
-            input.oninput = (e) => sendInput(i, e.target.value);
-            ansContainer.appendChild(input);
+            input.maxLength = 1;
+            input.oninput = (e) => {
+                if(myPos === i) update(ref(db, `rooms/${roomId}/answers`), { [i]: e.target.value });
+            };
+            container.appendChild(input);
         }
         updatePosButtons(q.answer.length);
     }
 
-    // 3. 入力同期（他人の回答は伏せる）
-    for (let i = 1; i <= q.answer.length; i++) {
+    // 文字同期
+    for(let i=1; i<=q.answer.length; i++) {
         const box = document.getElementById(`box-${i}`);
-        const pInput = data.players?.[i]?.input || "";
-        if (i === myPos) {
-            box.disabled = (data.status === 'reveal');
-        } else {
-            box.disabled = true;
-            box.value = (data.status === 'reveal') ? pInput : (pInput ? "●" : "");
-        }
-        
-        // 判定色
-        if (data.status === 'judged') {
-            box.classList.add(data.result ? 'correct' : 'wrong');
-        } else {
-            box.classList.remove('correct', 'wrong');
-        }
+        const val = data.answers?.[i] || "";
+        if(i !== myPos) box.value = (data.status === 'reveal' || data.status === 'judged') ? val : (val ? "●" : "");
+        if(data.status === 'judged') box.style.background = data.result ? "#dcfce7" : "#fee2e2";
+        else box.style.background = "white";
     }
 
-    // ホスト権限の表示
-    document.getElementById('host-controls').classList.toggle('hidden', !isHost);
-    document.getElementById('judgement-btns').classList.toggle('hidden', data.status !== 'reveal');
+    document.getElementById('host-panel').classList.toggle('hidden', !isHost);
+    document.getElementById('judge-controls').classList.toggle('hidden', data.status === 'waiting');
+    document.getElementById('display-timer').innerText = `残り ${data.timer || 0} 秒`;
 }
 
-window.sendInput = (pos, val) => {
-    if (pos !== myPos) return;
-    update(ref(db, `rooms/${currentRoomId}/players/${pos}`), { input: val });
-};
-
-window.updatePosButtons = (count) => {
+window.updatePosButtons = (len) => {
     const container = document.getElementById('pos-buttons');
     container.innerHTML = "";
-    for (let i = 1; i <= count; i++) {
-        const btn = document.createElement('button');
-        btn.innerText = `${i}番`;
-        btn.onclick = () => { myPos = i; alert(i + "番に決定"); };
-        container.appendChild(btn);
+    for(let i=1; i<=len; i++) {
+        const b = document.createElement('button');
+        b.innerText = `${i}番`;
+        b.onclick = () => { myPos = i; alert(`${i}番に決定`); };
+        container.appendChild(b);
     }
 };
 
-// ホスト操作
-window.startNextQuestion = async () => {
+// ホスト操作：開始
+window.startNextQuestion = () => {
     const setId = document.getElementById('set-selector').value;
-    onValue(ref(db, `library/${setId}`), (snapshot) => {
-        const set = snapshot.val();
-        const q = set.questions[0]; // 簡易的に1問目。実際はindexを管理。
-        update(ref(db, `rooms/${currentRoomId}`), {
+    onValue(ref(db, `library/${setId}`), (snap) => {
+        const setData = snap.val();
+        const q = setData.questions[0]; // 1問目固定。実際は進捗を保存可能。
+        let timeLeft = q.time;
+        set(ref(db, `rooms/${roomId}`), {
             currentQuestion: q,
             status: 'playing',
-            players: {} // リセット
+            answers: {},
+            timer: timeLeft
         });
+        // タイマー開始
+        const interval = setInterval(() => {
+            timeLeft--;
+            update(ref(db, `rooms/${roomId}`), { timer: timeLeft });
+            if(timeLeft <= 0) { clearInterval(interval); revealAnswers(); }
+        }, 1000);
     }, { onlyOnce: true });
 };
 
-window.revealAnswers = () => {
-    update(ref(db, `rooms/${currentRoomId}`), { status: 'reveal' });
-};
-
-window.judge = (isCorrect) => {
-    update(ref(db, `rooms/${currentRoomId}`), { status: 'judged', result: isCorrect });
-};
+window.revealAnswers = () => update(ref(db, `rooms/${roomId}`), { status: 'reveal' });
+window.judge = (res) => update(ref(db, `rooms/${roomId}`), { status: 'judged', result: res });
