@@ -3,83 +3,74 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ファイブリーグ・オンライン</title>
+    <title>ネプリーグ再現・オンライン</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div id="app">
-        <!-- 1. ロビー画面 -->
+        <!-- ロビー -->
         <section id="view-lobby" class="view">
-            <h1>FIVE LEAGUE</h1>
+            <h1 class="logo">FIVE LEAGUE</h1>
             <div class="card">
-                <input type="text" id="room-id" placeholder="ルームIDを入力">
-                <button onclick="joinRoom()">参加 / ルーム作成</button>
+                <input type="text" id="room-id" placeholder="ルームID（例: 1234）">
+                <button onclick="joinRoom()">ルームに参加 / 作成</button>
                 <hr>
-                <button class="secondary" onclick="showView('view-admin')">問題セットを作成する</button>
+                <button class="secondary" onclick="showView('view-admin')">問題セットを作る</button>
             </div>
         </section>
 
-        <!-- 2. 問題セット作成画面 -->
+        <!-- 問題作成 -->
         <section id="view-admin" class="view hidden">
             <h2>問題セット作成</h2>
             <div class="card scrollable">
-                <input type="text" id="set-title" placeholder="セット名 (例: 難読漢字)">
+                <input type="text" id="set-title" placeholder="セット名">
                 <input type="password" id="set-pass" placeholder="編集用パスワード">
-                <div id="question-list">
-                    <!-- フォームが追加される -->
-                </div>
+                <div id="question-list"></div>
                 <button onclick="addQuestionForm()">+ 問題を追加</button>
-                <button class="success" onclick="saveQuestionSet()">セットを保存して完了</button>
-                <button onclick="showView('view-lobby')">戻る</button>
+                <button class="success" onclick="saveQuestionSet()">保存して戻る</button>
+                <button onclick="showView('view-lobby')">キャンセル</button>
             </div>
         </section>
 
-        <!-- 3. ゲーム画面 -->
+        <!-- ゲーム画面 -->
         <section id="view-game" class="view hidden">
-            <div id="game-header">
-                <span id="display-mode">MODE: ---</span>
-                <span id="display-timer">TIME: --</span>
+            <div id="game-info">
+                <div id="display-timer">残り -- 秒</div>
+                <div id="display-mode">--- LEAGUE</div>
             </div>
 
-            <div id="question-display" class="card">
+            <div id="question-area" class="card">
                 <img id="q-image" src="" class="hidden">
                 <h2 id="q-text">待機中...</h2>
             </div>
 
-            <div id="answer-container">
-                <!-- JavaScriptで動的に枠を生成 -->
-            </div>
+            <div id="answer-container"></div>
 
-            <div id="player-status" class="grid-5">
-                <!-- プレイヤーの準備状況 -->
-            </div>
-
-            <div id="host-controls" class="hidden">
-                <button id="btn-reveal" onclick="revealAnswers()">回答オープン！</button>
-                <div id="judgement-btns" class="hidden">
-                    <button class="success" onclick="judge(true)">✅ 正解</button>
-                    <button class="danger" onclick="judge(false)">❌ 不正解</button>
+            <div id="host-panel" class="hidden">
+                <p>【ホスト操作パネル】</p>
+                <select id="set-selector"></select>
+                <button onclick="startNextQuestion()">このセットで開始 / 次へ</button>
+                <div id="judge-controls" class="hidden">
+                    <button class="reveal-btn" onclick="revealAnswers()">回答オープン！</button>
+                    <div class="flex">
+                        <button class="success" onclick="judge(true)">✅ 正解</button>
+                        <button class="danger" onclick="judge(false)">❌ 不正解</button>
+                    </div>
                 </div>
-                <select id="set-selector">
-                    <option value="">問題セットを選択</option>
-                </select>
-                <button onclick="startNextQuestion()">次の問題へ</button>
             </div>
-            
-            <div id="position-selector">
-                <p>自分のポジションを選択：</p>
-                <div class="grid-5" id="pos-buttons"></div>
+
+            <div id="player-panel">
+                <p>担当ポジションを選んでください：</p>
+                <div id="pos-buttons" class="flex"></div>
             </div>
         </section>
     </div>
 
-    <!-- Firebase SDK (ES Modules) -->
     <script type="importmap">
     {
       "imports": {
         "firebase/app": "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js",
-        "firebase/database": "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js",
-        "firebase/storage": "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js"
+        "firebase/database": "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js"
       }
     }
     </script>
