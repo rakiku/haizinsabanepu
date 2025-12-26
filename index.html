@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ファイブリーグ・オンライン</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app">
+        <!-- 1. ロビー画面 -->
+        <section id="view-lobby" class="view">
+            <h1>FIVE LEAGUE</h1>
+            <div class="card">
+                <input type="text" id="room-id" placeholder="ルームIDを入力">
+                <button onclick="joinRoom()">参加 / ルーム作成</button>
+                <hr>
+                <button class="secondary" onclick="showView('view-admin')">問題セットを作成する</button>
+            </div>
+        </section>
+
+        <!-- 2. 問題セット作成画面 -->
+        <section id="view-admin" class="view hidden">
+            <h2>問題セット作成</h2>
+            <div class="card scrollable">
+                <input type="text" id="set-title" placeholder="セット名 (例: 難読漢字)">
+                <input type="password" id="set-pass" placeholder="編集用パスワード">
+                <div id="question-list">
+                    <!-- フォームが追加される -->
+                </div>
+                <button onclick="addQuestionForm()">+ 問題を追加</button>
+                <button class="success" onclick="saveQuestionSet()">セットを保存して完了</button>
+                <button onclick="showView('view-lobby')">戻る</button>
+            </div>
+        </section>
+
+        <!-- 3. ゲーム画面 -->
+        <section id="view-game" class="view hidden">
+            <div id="game-header">
+                <span id="display-mode">MODE: ---</span>
+                <span id="display-timer">TIME: --</span>
+            </div>
+
+            <div id="question-display" class="card">
+                <img id="q-image" src="" class="hidden">
+                <h2 id="q-text">待機中...</h2>
+            </div>
+
+            <div id="answer-container">
+                <!-- JavaScriptで動的に枠を生成 -->
+            </div>
+
+            <div id="player-status" class="grid-5">
+                <!-- プレイヤーの準備状況 -->
+            </div>
+
+            <div id="host-controls" class="hidden">
+                <button id="btn-reveal" onclick="revealAnswers()">回答オープン！</button>
+                <div id="judgement-btns" class="hidden">
+                    <button class="success" onclick="judge(true)">✅ 正解</button>
+                    <button class="danger" onclick="judge(false)">❌ 不正解</button>
+                </div>
+                <select id="set-selector">
+                    <option value="">問題セットを選択</option>
+                </select>
+                <button onclick="startNextQuestion()">次の問題へ</button>
+            </div>
+            
+            <div id="position-selector">
+                <p>自分のポジションを選択：</p>
+                <div class="grid-5" id="pos-buttons"></div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Firebase SDK (ES Modules) -->
+    <script type="importmap">
+    {
+      "imports": {
+        "firebase/app": "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js",
+        "firebase/database": "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js",
+        "firebase/storage": "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js"
+      }
+    }
+    </script>
+    <script type="module" src="script.js"></script>
+</body>
+</html>
