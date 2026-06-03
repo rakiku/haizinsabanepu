@@ -3,77 +3,518 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ネプリーグ再現・オンライン</title>
-    <link rel="stylesheet" href="style.css">
+    <title>原神 縛りプレイルーレット ボス・縛りルーレット</title>
+    <meta name="description" content="原神のボスや縛り内容を自動で抽選するWebツールです。マルチプレイ（1～4人）に対応し、キャラルーレットや武器縛りなど、詳細なカスタム設定も可能です。ランダム螺旋や幻想シアターモードもあります。詳細なデータベースもあります。">
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div id="app">
-        <!-- ロビー -->
-        <section id="view-lobby" class="view">
-            <h1 class="logo">FIVE LEAGUE</h1>
-            <div class="card">
-                <input type="text" id="room-id" placeholder="ルームID（例: 1234）">
-                <button onclick="joinRoom()">ルームに参加 / 作成</button>
-                <hr>
-                <button class="secondary" onclick="showView('view-admin')">問題セットを作る</button>
-            </div>
-        </section>
+    <!-- 画面固定ホームボタン -->
+    <button id="homeButton" class="home-button">最初に戻る</button>
 
-        <!-- 問題作成 -->
-        <section id="view-admin" class="view hidden">
-            <h2>問題セット作成</h2>
-            <div class="card scrollable">
-                <input type="text" id="set-title" placeholder="セット名">
-                <input type="password" id="set-pass" placeholder="編集用パスワード">
-                <div id="question-list"></div>
-                <button onclick="addQuestionForm()">+ 問題を追加</button>
-                <button class="success" onclick="saveQuestionSet()">保存して戻る</button>
-                <button onclick="showView('view-lobby')">キャンセル</button>
+    <div class="container">
+        <!-- 1. スタート画面 -->
+        <div id="startScreen">
+            <div id="homeModeSwitcher">
+                <button id="startSpiralModeButton">螺旋モード</button>
+                <button id="startTheaterModeButton">幻想シアターモード</button>
             </div>
-        </section>
-
-        <!-- ゲーム画面 -->
-        <section id="view-game" class="view hidden">
-            <div id="game-info">
-                <div id="display-timer">残り -- 秒</div>
-                <div id="display-mode">--- LEAGUE</div>
+            <h1>原神縛りルーレット</h1>
+            
+            <div class="input-group">
+                <label>プレイヤー数：</label>
+                <div class="number-controls">
+                    <button type="button" class="count-btn" onclick="adjustCount('playerCount', -1)">－</button>
+                    <input type="number" id="playerCount" value="1" min="1" max="4" readonly>
+                    <button type="button" class="count-btn" onclick="adjustCount('playerCount', 1)">＋</button>
+                </div>
             </div>
-
-            <div id="question-area" class="card">
-                <img id="q-image" src="" class="hidden">
-                <h2 id="q-text">待機中...</h2>
+            
+            <div class="input-group">
+                <label>縛りの数：</label>
+                <div class="number-controls">
+                    <button type="button" class="count-btn" onclick="adjustCount('bindCount', -1)">－</button>
+                    <input type="number" id="bindCount" value="1" min="1" max="4" readonly>
+                    <button type="button" class="count-btn" onclick="adjustCount('bindCount', 1)">＋</button>
+                </div>
+            </div>
+            
+            <div id="playerNameInputsContainer">
+                <!-- JSで生成 -->
             </div>
 
-            <div id="answer-container"></div>
+            <div class="button-group">
+                <button id="startAllButton">ボス＋縛りルーレット</button>
+                <button id="startBossButton">ボスルーレットのみ</button>
+                <button id="startBindButton">縛りルーレットのみ</button>
+                <button id="showBindSelectionButton">詳細縛り設定</button>
+                <button id="showCustomBindScreenButton">カスタム縛り設定</button>
+            </div>
 
-            <div id="host-panel" class="hidden">
-                <p>【ホスト操作パネル】</p>
-                <select id="set-selector"></select>
-                <button onclick="startNextQuestion()">このセットで開始 / 次へ</button>
-                <div id="judge-controls" class="hidden">
-                    <button class="reveal-btn" onclick="revealAnswers()">回答オープン！</button>
-                    <div class="flex">
-                        <button class="success" onclick="judge(true)">✅ 正解</button>
-                        <button class="danger" onclick="judge(false)">❌ 不正解</button>
+
+
+            <div class="settings-group">
+                <button id="showMemberSettingsButton" class="member-settings-button">メンバーの所持状況設定</button>
+            </div>
+
+            <div class="about-button-container">
+                <button id="showCharDataButton" class="about-button">キャラクターデータ</button>
+                <button id="showAboutButton" class="about-button">このルーレットについて</button>
+            </div>
+        </div>
+
+        <!-- 2. カスタム縛り設定画面 -->
+        <div id="customBindScreen" class="hidden">
+            <h2>カスタム縛り設定</h2>
+            <p>実行したい縛りにチェックを入れ、詳細を設定してください。</p>
+            
+            <div class="custom-section">
+                <h3>ボスの選択</h3>
+                <select id="customBossSelect">
+                    <!-- JSで五十音順に生成 -->
+                </select>
+            </div>
+
+            <div id="customBindsCommon">
+                <h3>共通の縛り</h3>
+                <div id="customBindGrid" class="custom-bind-grid"></div>
+                <div class="custom-bind-checkboxes">
+                    <h3>追加ルール</h3>
+                    <div id="customBindButtonsCommon" class="button-group-checkbox"></div>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="weeklyBossModeCustom">
+                        週ボスモード
+                    </label>
+                </div>
+            </div>
+            <div id="customBindsPlayersContainer"></div>
+            <button id="executeCustomBindsButton">この条件で実行</button>
+        </div>
+ 
+        <!-- 3. 詳細縛り選択画面 -->
+        <div id="bindSelection" class="hidden">
+            <h2>縛りを選択してください</h2>
+            <div id="bindButtons" class="button-group-checkbox"></div>
+            <div style="margin-top: 20px;">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="weeklyBossModeSelection">
+                    週ボスモード
+                </label>
+            </div>
+            <button id="executeSelectionButton">選択した縛りで実行</button>
+        </div>
+
+        <!-- 4. ルーレット実行画面 -->
+        <div id="rouletteScreen" class="hidden">
+            <h2 id="currentPlayerNameDisplay"></h2>
+            <div class="roulette-container">
+                <canvas id="rouletteCanvas" width="500" height="500"></canvas>
+            </div>
+            <div class="controls">
+                <button id="spinButton">スピン</button>
+                <button id="stopButton" disabled>ストップ</button>
+                <button id="nextButton" class="hidden">次へ</button>
+                <button id="notOwnedButton" class="hidden">持っていない（リロール）</button>
+            </div>
+            <div id="popup" class="popup"></div>
+        </div>
+
+        <!-- 5. 結果表示画面 -->
+        <div id="resultScreen" class="hidden">
+            <h1>結果</h1>
+            <div id="results"></div>
+            <div id="retryContainer"></div>
+            <button id="backToStartButton">最初に戻る</button>
+        </div>
+
+        <!-- 6. 螺旋モード -->
+        <div id="spiralModeScreen" class="hidden">
+            <h2>螺旋モード</h2>
+            <div class="mode-card">
+                <label for="spiralPlayerNameInput">プレイヤー名</label>
+                <input type="text" id="spiralPlayerNameInput" value="プレイヤー1" class="mode-text-input">
+                <div class="mode-button-row">
+                    <button id="openSpiralMemberSettingsButton" class="member-settings-button">所持キャラ設定</button>
+                    <button id="executeSpiralDrawButton">螺旋抽選</button>
+                </div>
+                <div id="spiralModeMessage" class="mode-message"></div>
+            </div>
+            <div id="spiralModeResult" class="mode-card hidden">
+                <h3>抽選結果</h3>
+                <div class="split-result-grid">
+                    <div>
+                        <h4>前半</h4>
+                        <div id="spiralTopResult" class="result-image-container"></div>
+                    </div>
+                    <div>
+                        <h4>後半</h4>
+                        <div id="spiralBottomResult" class="result-image-container"></div>
                     </div>
                 </div>
             </div>
+        </div>
 
-            <div id="player-panel">
-                <p>担当ポジションを選んでください：</p>
-                <div id="pos-buttons" class="flex"></div>
+        <!-- 7. 幻想シアターモード -->
+        <div id="theaterModeScreen" class="hidden">
+            <h2>幻想シアターモード</h2>
+            <div class="mode-card">
+                <label for="theaterPlayerNameInput">プレイヤー名</label>
+                <input type="text" id="theaterPlayerNameInput" value="プレイヤー1" class="mode-text-input">
+                <button id="openTheaterMemberSettingsButton" class="member-settings-button">所持キャラ設定</button>
             </div>
-        </section>
+            <div class="mode-card">
+                <h3>1. 対応元素を3つ選択</h3>
+                <div id="theaterElementSelector" class="selection-grid"></div>
+            </div>
+            <div class="mode-card">
+                <h3>2. 開幕キャストを6人選択</h3>
+                <p>※対応元素キャラのみ選択できます。</p>
+                <div id="theaterOpeningCastSelector" class="selection-grid character-selection-grid"></div>
+            </div>
+            <div class="mode-card">
+                <h3>3. 特別招待キャストを4人選択</h3>
+                <p>※未所持キャラを含む場合は抽選できません。</p>
+                <label for="theaterSpecialSearchInput">名前で検索</label>
+                <input type="text" id="theaterSpecialSearchInput" class="mode-text-input" placeholder="特別招待キャストを検索">
+                <div id="theaterSpecialCastSelector" class="selection-grid character-selection-grid"></div>
+            </div>
+            <div class="mode-card">
+                <h3>4. 難易度を選択</h3>
+                <select id="theaterDifficultySelect" class="mode-text-input">
+                    <option value="easy">イージー</option>
+                    <option value="normal" selected>ノーマル</option>
+                    <option value="hard">ハード</option>
+                    <option value="master">マスター</option>
+                    <option value="moon">月諭</option>
+                </select>
+                <button id="executeTheaterDrawButton">幻想シアター抽選</button>
+                <div id="theaterModeMessage" class="mode-message"></div>
+            </div>
+            <div id="theaterModeResult" class="mode-card hidden">
+                <h3>抽選結果</h3>
+                <div id="theaterResultList" class="result-image-container"></div>
+            </div>
+        </div>
     </div>
 
-    <script type="importmap">
-    {
-      "imports": {
-        "firebase/app": "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js",
-        "firebase/database": "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js"
-      }
-    }
-    </script>
-    <script type="module" src="script.js"></script>
+    <!-- 8. 所持状況設定モーダル -->
+    <div id="memberSettingsModal" class="modal-overlay hidden">
+        <div class="modal-content large">
+            <button class="close-button" id="closeMemberSettings">&times;</button>
+            <h2>メンバーの所持・完凸設定</h2>
+            
+            <!-- プレイヤー名入力画面 -->
+            <div id="playerNameInputScreen">
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 10px;">プレイヤー名を入力してください：</label>
+                    <input type="text" id="modalPlayerNameInput" placeholder="プレイヤー名" style="width: 100%; padding: 10px; box-sizing: border-box;">
+                </div>
+                <button id="goToSettingsButton" style="width: 100%; padding: 15px; background: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;">次へ</button>
+            </div>
+            
+            <!-- プレイヤー選択エリア（非表示） -->
+            <div class="member-select-row hidden" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">
+                <!-- JSで各プレイヤーのセレクトボックスを生成 -->
+            </div>
+            
+            <div id="possessionTabs" class="hidden">
+                <div class="tab-buttons" style="display: flex; gap: 5px; margin-bottom: 15px;">
+                    <button class="tab-btn active" id="tab-char" onclick="showTab('charTab')">キャラクター</button>
+                    <button class="tab-btn" id="tab-weapon" onclick="showTab('weaponTab')">武器</button>
+                </div>
+                <div id="charTab" class="tab-content">
+                    <div class="tab-actions" style="margin-bottom: 10px;">
+                        <button onclick="bulkCheck('char', true)">全所持</button>
+                        <button onclick="bulkCheck('char', false)">全解除</button>
+                    </div>
+                    <div id="charSettingList" class="possession-grid"></div>
+                </div>
+                <div id="weaponTab" class="tab-content hidden">
+                    <div class="tab-actions" style="margin-bottom: 10px;">
+                        <button onclick="bulkCheck('weapon', true)">全所持</button>
+                        <button onclick="bulkCheck('weapon', false)">全解除</button>
+                    </div>
+                    <div id="weaponSettingList" class="possession-grid"></div>
+                </div>
+                <button id="savePlayerData" class="save-btn" style="width: 100%; padding: 15px; background: #27ae60; margin-top: 20px;">この名前で保存する</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 7. About画面 -->
+    <div id="aboutScreen" class="modal-overlay hidden">
+        <div class="modal-content">
+            <button id="closeAboutButton" class="close-button">&times;</button>
+            <h3>～このルーレットについて～</h3>
+            <p>
+                このルーレットは、普段遊んでいるサーバーでやっている縛り原神の縛りの抽選が大変だったのでそれをスムーズに作成者がいなくても誰でもできるようにしたい！という理念のもと作成しています。できることはボスの抽選、縛りプレイの抽選、縛りの内容の抽選です。プレイ人数は原神のマルチできる人数1～4人、縛りの数は現実的に可能な4つまでとしています。
+            </p>
+
+            <h3>～配信や動画でのこのサイトの利用について～</h3>
+            <p>
+                配信、動画の概要欄にこのルーレットのURLを張っていただければご自由にお使いください。
+            </p>
+            
+            <h3>～使い方～</h3>
+            <p><strong>1. 人数と縛りの設定</strong><br>
+                プレイヤー数と縛りの数をそれぞれ１～４まで選ぶことができます。また、プレイヤーの名前の部分を選択することで好きな名前を入力することができます。マルチプレイの際に活用してください。</p>
+            <p><strong>2. 各ルーレットについて</strong><br>
+                「ボス＋縛りルーレット」<br>
+                　このルーレットでは、ボスと縛りをまとめて抽選することができます。縛りには個人に割り振られるものと全体で共通になっているものがあります。詳しくはカスタム縛り設定のところで確認することができます。<br>
+                「ボスルーレットのみ」<br>
+                　このルーレットではボスのみ抽選することができます<br>
+                「縛りルーレットのみ」<br>
+                　このルーレットでは縛りのみ抽選することができます<br>
+                「詳細縛り設定」<br>
+                　このルーレットでは縛りの中身のみをルーレットにすることができます。<br>
+                「カスタム縛り設定」<br>
+                　ここでは、自分で縛りの詳細を細かく設定することができます。<br>
+                「螺旋モード」<br>
+                　所持キャラ設定をしたプレイヤーの中から8人を抽選し、前半と後半の4人ずつに分けて編成を決めることができます。深境螺旋の編成決めを手早くしたいとき向けです。<br>
+                「幻想シアターモード」<br>
+                　対応元素、開幕キャスト、特別招待キャスト、難易度を設定して、その条件に合う所持キャラの中から候補を抽選できます。幻想シアターの編成を考えるとき向けです。<br>
+                「メンバーの所持状況設定」<br>
+                　ここでは、名前とキャラクターの所持、凸状況、武器の所持状況をあらかじめ設定することができます。設定をしておくとルーレットの抽選項目に反映され、非該当のものはルーレット項目に表示されなくなります。普段使いしてくれている方向けの機能です。<br>
+                ※ルーレットで抽選された項目はポップアップにて表示されます。その際、ポップアップをクリックもしくはタップすると閉じることができます。
+            </p>
+            
+            <h3>～各種縛りについて（全体共通）～</h3>
+            <p><strong>全体共通縛り</strong><br>
+                全体共通ではルーレットされるものとルールとして使用できなくなるものがあります。</p>
+            <div class="about-accordion">
+                <details class="about-accordion-item">
+                    <summary>国縛り</summary>
+                    <p>原神で実装されている国がランダムで選ばれます。その後選ばれるキャラクターはその国出身のキャラクターになります。（判断基準は神の目のフレーム例：トーマ→稲妻、タルタリヤ→スネージナヤ）</p>
+                </details>
+                <details class="about-accordion-item">
+                    <summary>モノ元素縛り</summary>
+                    <p>七つの元素からランダムに１つが選ばれます。その後選ばれるキャラクターはその元素の神の目をもつキャラクターになります。</p>
+                </details>
+                <details class="about-accordion-item">
+                    <summary>旅人縛り</summary>
+                    <p>使えるキャラクターが蛍、空に固定となります。</p>
+                </details>
+                <details class="about-accordion-item">
+                    <summary>恒常☆５縛り</summary>
+                    <p>恒常ガチャで出てくる☆５キャラクターのみとなります。武器は好きなものを使って大丈夫です。</p>
+                </details>
+                <details class="about-accordion-item">
+                    <summary>☆４キャラ武器</summary>
+                    <p>キャラも武器も☆４以外は使えません。☆４以下の武器を使うのは好きにしていただいて大丈夫です。</p>
+                </details>
+                <details class="about-accordion-item">
+                    <summary>初期キャラのみ</summary>
+                    <p>Ver1.0で実装されたキャラクターのみ使用できる縛りです。</p>
+                </details>
+                <details class="about-accordion-item">
+                    <summary>鍛錬の道縛り</summary>
+                    <p>鍛錬の道が実装されているキャラクターのみ使用できる縛りです。</p>
+                </details>
+                <details class="about-accordion-item">
+                    <summary>所持率100％縛り</summary>
+                    <p>有志のサイトでまとめられていた所持率100％のキャラクターのみ使用できる縛りです。</p>
+                </details>
+                <details class="about-accordion-item">
+                    <summary>配布武器縛り</summary>
+                    <p>過去に期間限定イベントでのみ配布された武器しか使えないという縛りです。</p>
+                </details>
+                <details class="about-accordion-item">
+                    <summary>スキル禁止</summary>
+                    <p>スキルの使用ができません</p>
+                </details>
+                <details class="about-accordion-item">
+                    <summary>完凸禁止</summary>
+                    <p>完凸しているキャラクターは使用できません。</p>
+                </details>
+                <details class="about-accordion-item">
+                    <summary>クラウン禁止</summary>
+                    <p>知恵の王冠をつかっている部分を使用することができません。（スキルに使っている場合はスキル禁止）</p>
+                </details>
+                <details class="about-accordion-item">
+                    <summary>回復禁止</summary>
+                    <p>回復をすることができません。被ダメが0のときに回復する効果が発動してもセーフです。（緑の＋1000などが見えない限りセーフ）</p>
+                </details>
+                <details class="about-accordion-item">
+                    <summary>誰か一人が倒れたら負け縛り</summary>
+                    <p>PTの中で誰かがやられたらその時点で1からやりなおすという縛りです。</p>
+                </details>
+                <details class="about-accordion-item">
+                    <summary>無凸縛り</summary>
+                    <p>無凸のキャラクターのみしか使えません</p>
+                </details>
+                <details class="about-accordion-item">
+                    <summary>聖遺物禁止</summary>
+                    <p>聖遺物を持たせることができません</p>
+                </details>
+                <details class="about-accordion-item">
+                    <summary>☆１、聖遺物なし</summary>
+                    <p>☆１武器かつ聖遺物をつけられないというしばりです。これが一番難しいです。（☆１武器がない場合一番レアリティが低いものをつかってください。ちなみに鍛冶屋で☆２武器は買えます。）</p>
+                </details>
+                <details class="about-accordion-item">
+                    <summary>UI非表示+リロール</summary>
+                    <p>UIを非表示にした状態で戦う+縛りをもう1つ増やすという縛りです。</p>
+                </details>
+                <details class="about-accordion-item">
+                    <summary>爆発禁止+リロール</summary>
+                    <p>元素爆発の使用ができない+縛りをもう1つ増やすという縛りです。</p>
+                </details>
+                <details class="about-accordion-item">
+                    <summary>聖遺物セット禁止</summary>
+                    <p>聖遺物のセット効果を発動してはいけないという縛りです。（要するにキメラでいこう）</p>
+                </details>
+            </div>
+            
+            <h3>～各種縛りについて（個人）～</h3>
+            <p><strong>個人の縛り</strong><br>
+                個人の縛りはその項目がすべてルーレットされて最終的にキャラクターが抽選されます。</p>
+            <div class="about-accordion">
+                <details class="about-accordion-item">
+                    <summary>各1.1縛り</summary>
+                    <p>各バージョンn.Nに実装されたキャラクターのみ使用できる縛りです。（N.0～だとほぼ国縛りで面白くないため、小数点のほうで縛っています）</p>
+                </details>
+                <details class="about-accordion-item">
+                    <summary>体型縛り</summary>
+                    <p>キャラクターのプレイアブルモデルで縛ります。</p>
+                </details>
+                <details class="about-accordion-item">
+                    <summary>役割縛り</summary>
+                    <p>幻想シアターで追加されたキャラクターの役割に基づいて縛ります。</p>
+                </details>
+                <details class="about-accordion-item">
+                    <summary>元素エネルギー縛り</summary>
+                    <p>キャラクターの元素爆発に必要なエネルギーの量で縛ります。（30はフリンズとヴァレサの2名ですが、この際は特殊爆発のみの縛りとします。逆に通常の爆発で抽選された場合は特殊爆発の使用はできません）</p>
+                </details>
+                <details class="about-accordion-item">
+                    <summary>ボス素材縛り</summary>
+                    <p>突破に必要なボス素材で縛ります。</p>
+                </details>
+                <details class="about-accordion-item">
+                    <summary>特産品縛り</summary>
+                    <p>突破に必要な特産品で縛ります。</p>
+                </details>
+                <details class="about-accordion-item">
+                    <summary>突破ステータス縛り(キャラ)</summary>
+                    <p>キャラクターの突破ステータスで縛ります。</p>
+                </details>
+                <details class="about-accordion-item">
+                    <summary>突破ステータス縛り(武器)</summary>
+                    <p>武器の突破ステータスで縛ります。</p>
+                </details>
+                <details class="about-accordion-item">
+                    <summary>武器種縛り</summary>
+                    <p>キャラクターの使える武器種でしばります。（法器、片手剣など）</p>
+                </details>
+                <details class="about-accordion-item">
+                    <summary>誕生月縛り</summary>
+                    <p>キャラクターのプロフィールにある誕生月で縛ります。（個人に依存する旅人は選ばれません）</p>
+                </details>
+                <details class="about-accordion-item">
+                    <summary>アルファベット縛り</summary>
+                    <p>各キャラクターを英語表記した際の頭文字で縛ります。</p>
+                </details>
+                <details class="about-accordion-item">
+                    <summary>武器縛り</summary>
+                    <p>全ての武器の中からランダムで1つ選ばれます。その武器を使えるキャラクターならだれでも大丈夫です。</p>
+                </details>
+                <details class="about-accordion-item">
+                    <summary>配布キャラ縛り</summary>
+                    <p>過去に期間限定イベントでのみ配布されたキャラクターしか使えないという縛りです。これはランダムで抽選されます。</p>
+                </details>
+                <details class="about-accordion-item">
+                    <summary>キャラルーレット</summary>
+                    <p>原神に実装されているプレイアブルキャラクターからランダムに選ばれ、そのキャラクターしか使えないという縛りです。</p>
+                </details>
+                <details class="about-accordion-item">
+                    <summary>キャラ武器ルーレット</summary>
+                    <p>キャラも武器もランダムに選ばれるという縛りです。</p>
+                </details>
+                <details class="about-accordion-item">
+                    <summary>天賦素材縛り</summary>
+                    <p>天賦育成に必要な天賦素材の種類ごとにキャラクターを選ぶという縛りです。</p>
+                </details>
+                <details class="about-accordion-item">
+                    <summary>オリジナル料理種別縛り</summary>
+                    <p>キャラクターのオリジナル料理の種類ごとにキャラクターを選ぶという縛りです。</p>
+                </details>
+                <details class="about-accordion-item">
+                    <summary>週ボス素材縛り</summary>
+                    <p>天賦の育成に必要な週ボスの素材ごとにキャラクターを選ぶという縛りです。</p>
+                </details>
+                <details class="about-accordion-item">
+                    <summary>別衣装縛り</summary>
+                    <p>別衣装を持っているキャラクターから選ぶという縛りです。（別衣装を持っていなければ使えないという想定です。）</p>
+                </details>
+                <details class="about-accordion-item">
+                    <summary>軌跡ついてるキャラ縛り</summary>
+                    <p>空想の軌跡を獲得しているキャラクターから選ぶという縛りです。（空想の軌跡をクリアしていなければ使えないという想定です。）</p>
+                </details>
+            </div>
+            
+            
+
+            <h3>～Q＆A～</h3>
+            <p><strong>Q: 所持していない武器が出たら？</strong><br>
+                A: 「持っていない」ボタンでその武器を削除してもう一度ルーレットを回せます。</p>
+            <p><strong>Q:各1.1縛りってなに？</strong><br>
+                A:各キャラクターが実装されたバージョンの小数点第１位の値で縛るルーレットになっています。各バージョンで縛るよりバラエティに富んだキャラクターが引けるのでこっちのほうが楽しいという判断でこうなりました。</p>
+            <p><strong>Q: 縛りの重複はどう処理？</strong><br>
+                A: 重複しないようになっています。</p>
+            <p><strong>Q: 条件の矛盾が出た場合は？</strong><br>
+                A: 出ないようになっています。</p>
+            <p><strong>Q: ルーレットの結果を保存できますか？</strong><br>
+                A: 保存機能はありません。必要であればスクショを撮ることをおすすめします。</p>
+            <p><strong>Q: モバイルでも使えますか？</strong><br>
+                A: はい、スマホでもプレイは可能ですがUIが少し歪になってしまいます。</p>
+            <p><strong>Q: 縛り数が4つに制限されているのはなぜ？</strong><br>
+                A: 普段遊んでいてできる範囲でMAXなのが4つだったのでそこを上限にしました。</p>
+            <p><strong>Q: ボスや縛りを自分で選べますか？</strong><br>
+                A: 「縛りを選ぶ」モードで縛りを手動選択可能。ボスはランダムのみとなっています。</p>
+            <p><strong>Q: アーロイや旅人の扱いは？</strong><br>
+                A: 基本的には例外扱いとしていますが、抽選される可能性があります。（国＝例外、旅人のみ誕生日なし）</p>
+            <p><strong>Q: データミスを見つけたらどうすればいい？</strong><br>
+                A: Twitter：@rakiku_genshin にDMでご報告ください。（フォローしていただいてからだとなんでフォローされたのか気になるので早く見ると思います。）</p>
+            <p><strong>Q: マルチプレイでの縛りは全員同じ？</strong><br>
+                A: 共通縛りと個別の縛りがあります。例えば、回復禁止などは共通ですがキャラルーレットは全員個別でキャラを抽選します。</p>
+            <p><strong>Q:ナドクライのバージョンはなに？</strong><br>
+                A:認識としては「Luna I」ですが各1.1縛りにおいては新しく項目を作るのは大変なので6.nということにしています。そのため、ラウマ、フリンズ、アイノは各1.1縛りにおいてはn.0に登場します.</p>
+
+            <h3>～注意事項～</h3>
+            <p>
+                これは非公式のファンメイドツールです。アップデートは作者がやりたいときに頑張ります。作者がプログラムを組むのはこれが初めてなのでバグがめちゃくちゃあるかもしれませんがご容赦ください。<br>
+                製作者Twitter:<a href="https://x.com/rakiku_genshin" target="_blank" rel="noopener noreferrer">@rakiku_genshin</a>
+            </p>
+        </div>
+    </div>
+
+
+    <!-- 8. キャラクター/武器データモーダル -->
+    <div id="charDataModal" class="modal-overlay hidden">
+        <div class="modal-content large">
+            <button class="close-button" id="closeCharDataModal">&times;</button>
+            <h2>キャラクター・武器データ</h2>
+            <div class="tab-buttons">
+                <button class="tab-btn active" id="charDataTab-char" onclick="showCharDataTab('charDataCharTab')">キャラクター</button>
+                <button class="tab-btn" id="charDataTab-weapon" onclick="showCharDataTab('charDataWeaponTab')">武器</button>
+            </div>
+            <div id="charDataCharTab" class="tab-content">
+                <div id="charDataFilters" class="data-filters"></div>
+                <div id="charDataList" class="possession-grid data-list"></div>
+            </div>
+            <div id="charDataWeaponTab" class="tab-content hidden">
+                <div id="weaponDataFilters" class="data-filters"></div>
+                <div id="weaponDataList" class="possession-grid data-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 9. キャラクター詳細モーダル -->
+    <div id="detailModal" class="modal-overlay hidden">
+        <div class="modal-content" id="detailModalContent">
+            <button class="close-button" id="closeDetailModal">&times;</button>
+            <div id="detailModalBody"></div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
 </body>
 </html>
